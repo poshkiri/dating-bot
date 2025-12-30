@@ -321,13 +321,13 @@ async def cmd_invite(message: Message, session: AsyncSession):
 
 Вот твоя личная ссылка 👇
 
-MeetUp ❤️ в Telegram! Найдет друзей или даже половинку 👫
+Знакомства рядом ❤️ в Telegram! Найдет друзей или даже половинку 👫
 
 👉 {referral_link}"""
     
     from keyboards.common import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Отправить друзьям в Telegram", url=f"https://t.me/share/url?url={referral_link}&text=MeetUp ❤️")
+        InlineKeyboardButton(text="Отправить друзьям в Telegram", url=f"https://t.me/share/url?url={referral_link}&text=ЗнакомстваРядом❤️")
     ]])
     
     await message.answer(text, reply_markup=keyboard)
