@@ -228,7 +228,7 @@ async def process_done(message: Message, state: FSMContext, session: AsyncSessio
             logger = logging.getLogger(__name__)
             logger.warning(f"Не удалось отправить фото: {e}. Отправляем текст без фото.")
             await message.answer(text, reply_markup=get_confirm_keyboard(), parse_mode="HTML")
-        else:
+    else:
         await message.answer(text, reply_markup=get_confirm_keyboard(), parse_mode="HTML")
     
     await state.set_state(ProfileCreation.confirm)
