@@ -93,8 +93,21 @@ async def cmd_my_profile(message: Message, session: AsyncSession, state: FSMCont
     text = "Так выглядит твоя анкета:\n\n"
     text += format_profile_text(user)
     
-    # Отправляем фото, если есть
-    if user.photos and len(user.photos) > 0:
+    # Приоритет: сначала видео, потом фото
+    if user.videos and len(user.videos) > 0:
+        try:
+            await message.answer_video(user.videos[0], caption=text, reply_markup=get_my_profile_keyboard())
+        except Exception as e:
+            logger.warning(f"Не удалось отправить видео: {e}. Пробуем фото.")
+            # Если видео не отправилось, пробуем фото
+            if user.photos and len(user.photos) > 0:
+                try:
+                    await message.answer_photo(user.photos[0], caption=text, reply_markup=get_my_profile_keyboard())
+                except:
+                    await message.answer(text, reply_markup=get_my_profile_keyboard())
+            else:
+                await message.answer(text, reply_markup=get_my_profile_keyboard())
+    elif user.photos and len(user.photos) > 0:
         try:
             await message.answer_photo(user.photos[0], caption=text, reply_markup=get_my_profile_keyboard())
         except Exception as e:

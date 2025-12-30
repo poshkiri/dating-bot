@@ -51,7 +51,23 @@ async def message_view_profiles(message: Message, session: AsyncSession, state: 
     keyboard.inline_keyboard[0][2].callback_data = f"super_like_{next_profile.id}"
     keyboard.inline_keyboard[1][0].callback_data = f"next_profile"
     
-    if next_profile.photos and len(next_profile.photos) > 0:
+    # Приоритет: сначала видео, потом фото
+    if next_profile.videos and len(next_profile.videos) > 0:
+        try:
+            await message.answer_video(next_profile.videos[0], caption=text, reply_markup=keyboard)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Не удалось отправить видео профиля: {e}. Пробуем фото.")
+            # Если видео не отправилось, пробуем фото
+            if next_profile.photos and len(next_profile.photos) > 0:
+                try:
+                    await message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard)
+                except:
+                    await message.answer(text, reply_markup=keyboard)
+            else:
+                await message.answer(text, reply_markup=keyboard)
+    elif next_profile.photos and len(next_profile.photos) > 0:
         try:
             await message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard)
         except Exception as e:
