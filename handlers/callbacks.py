@@ -102,18 +102,26 @@ async def callback_view_profiles(callback: CallbackQuery, session: AsyncSession,
 @router.callback_query(F.data.startswith("like_"))
 async def callback_like(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
     """Лайк"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     user_id = callback.from_user.id
+    logger.info(f"Обработка лайка от пользователя {user_id}, callback_data: {callback.data}")
     
     # Получаем ID целевого пользователя из callback_data
     try:
         target_user_id = int(callback.data.split("_")[1])
-    except (ValueError, IndexError):
+        logger.info(f"ID целевого пользователя из callback_data: {target_user_id}")
+    except (ValueError, IndexError) as e:
+        logger.warning(f"Ошибка парсинга callback_data: {e}, пытаемся получить из состояния")
         # Пытаемся получить из состояния (последний просмотренный профиль)
         data = await state.get_data()
         target_user_id = data.get("last_viewed_user_id")
         if not target_user_id:
+            logger.error(f"Не удалось получить ID пользователя из callback_data и состояния")
             await callback.answer("Ошибка! Профиль не найден.", show_alert=True)
             return
+        logger.info(f"ID целевого пользователя из состояния: {target_user_id}")
     
     result = await session.execute(select(User).where(User.telegram_id == user_id))
     user = result.scalar_one_or_none()
@@ -121,12 +129,19 @@ async def callback_like(callback: CallbackQuery, session: AsyncSession, state: F
     result_target = await session.execute(select(User).where(User.id == target_user_id))
     target_user = result_target.scalar_one_or_none()
     
-    if not user or not target_user:
-        await callback.answer("Ошибка!", show_alert=True)
+    if not user:
+        logger.error(f"Пользователь {user_id} не найден в БД")
+        await callback.answer("Ошибка! Начните с /start", show_alert=True)
+        return
+    
+    if not target_user:
+        logger.error(f"Целевой пользователь {target_user_id} не найден в БД")
+        await callback.answer("Ошибка! Пользователь не найден.", show_alert=True)
         return
     
     can, error_msg = await can_like(session, user)
     if not can:
+        logger.warning(f"Пользователь {user_id} не может поставить лайк: {error_msg}")
         await callback.answer(error_msg, show_alert=True)
         return
     
@@ -135,81 +150,93 @@ async def callback_like(callback: CallbackQuery, session: AsyncSession, state: F
         select(Like).where(Like.from_user_id == user.id, Like.to_user_id == target_user_id)
     )
     if existing_like.scalar_one_or_none():
+        logger.info(f"Пользователь {user_id} уже лайкнул {target_user_id}")
         await callback.answer("Вы уже лайкнули этого пользователя!", show_alert=True)
         return
     
-    # Создаем лайк
-    like = Like(from_user_id=user.id, to_user_id=target_user_id)
-    session.add(like)
+    logger.info(f"Создание лайка: пользователь {user_id} (id={user.id}) лайкает {target_user_id} (id={target_user.id})")
     
-    # Обновляем счетчики
-    user.daily_likes_used += 1
-    user.total_likes += 1
-    target_user.total_likes += 1
-    
-    # Проверяем взаимную симпатию
-    is_mutual = await check_mutual_like(session, user.id, target_user_id)
-    if is_mutual:
-        like.is_mutual = True
-        # Обновляем предыдущий лайк
-        prev_like = await session.execute(
-            select(Like).where(Like.from_user_id == target_user_id, Like.to_user_id == user.id)
-        )
-        prev_like_obj = prev_like.scalar_one_or_none()
-        if prev_like_obj:
-            prev_like_obj.is_mutual = True
-        
-        # Показываем взаимную симпатию с именем, username и кнопкой
-        target_name = target_user.name or target_user.first_name or "Пользователь"
-        target_username = target_user.username or ""
-        
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        mutual_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="👤 Посмотреть анкету", callback_data=f"view_profile_{target_user.id}")
-        ]])
-        
-        mutual_text = f"💕 Взаимная симпатия!\n\n"
-        mutual_text += f"👤 {target_name}"
-        if target_username:
-            mutual_text += f" (@{target_username})"
-        mutual_text += f"\n\nВы понравились друг другу!"
-        
-        await callback.message.answer(
-            mutual_text,
-            reply_markup=mutual_keyboard
-        )
-    
-    await session.commit()
-    await callback.answer("❤️ Лайк поставлен!")
-    
-    # УВЕДОМЛЯЕМ пользователя, которому поставили лайк (для всех, включая бесплатных)
     try:
-        liker_name = user.name or user.first_name or "Кто-то"
-        liker_username = user.username or ""
+        # Создаем лайк
+        like = Like(from_user_id=user.id, to_user_id=target_user_id)
+        session.add(like)
         
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        notification_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="👤 Посмотреть анкету", callback_data=f"view_profile_{user.id}")
-        ]])
+        # Обновляем счетчики (убрано daily_likes_used, так как лимиты отключены)
+        user.total_likes += 1
+        target_user.total_likes += 1
         
-        notification_text = f"❤️ Вам поставили лайк!\n\n"
-        notification_text += f"👤 {liker_name}"
-        if liker_username:
-            notification_text += f" (@{liker_username})"
+        # Проверяем взаимную симпатию
+        is_mutual = await check_mutual_like(session, user.id, target_user_id)
+        if is_mutual:
+            like.is_mutual = True
+            # Обновляем предыдущий лайк
+            prev_like = await session.execute(
+                select(Like).where(Like.from_user_id == target_user_id, Like.to_user_id == user.id)
+            )
+            prev_like_obj = prev_like.scalar_one_or_none()
+            if prev_like_obj:
+                prev_like_obj.is_mutual = True
+            
+            # Показываем взаимную симпатию с именем, username и кнопкой
+            target_name = target_user.name or target_user.first_name or "Пользователь"
+            target_username = target_user.username or ""
+            
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            mutual_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="👤 Посмотреть анкету", callback_data=f"view_profile_{target_user.id}")
+            ]])
+            
+            mutual_text = f"💕 Взаимная симпатия!\n\n"
+            mutual_text += f"👤 {target_name}"
+            if target_username:
+                mutual_text += f" (@{target_username})"
+            mutual_text += f"\n\nВы понравились друг другу!"
+            
+            await callback.message.answer(
+                mutual_text,
+                reply_markup=mutual_keyboard
+            )
         
-        # Отправляем уведомление
-        await callback.bot.send_message(
-            target_user.telegram_id,
-            notification_text,
-            reply_markup=notification_keyboard
-        )
+        await session.commit()
+        logger.info(f"Лайк успешно сохранен: пользователь {user_id} лайкнул {target_user_id}")
+        
+        # УВЕДОМЛЯЕМ пользователя, которому поставили лайк (для всех, включая бесплатных)
+        try:
+            liker_name = user.name or user.first_name or "Кто-то"
+            liker_username = user.username or ""
+            
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            notification_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="👤 Посмотреть анкету", callback_data=f"view_profile_{user.id}")
+            ]])
+            
+            notification_text = f"❤️ Вам поставили лайк!\n\n"
+            notification_text += f"👤 {liker_name}"
+            if liker_username:
+                notification_text += f" (@{liker_username})"
+            
+            # Отправляем уведомление
+            await callback.bot.send_message(
+                target_user.telegram_id,
+                notification_text,
+                reply_markup=notification_keyboard
+            )
+        except Exception as e:
+            logger.warning(f"Не удалось отправить уведомление о лайке пользователю {target_user.telegram_id}: {e}")
+        
+        # Показываем следующую анкету
+        try:
+            await callback_view_profiles(callback, session, state)
+        except Exception as e:
+            logger.error(f"Ошибка при показе следующего профиля после лайка: {e}", exc_info=True)
+            # Не показываем ошибку пользователю, просто логируем
+        
+        await callback.answer("❤️ Лайк поставлен!")
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Не удалось отправить уведомление о лайке пользователю {target_user.telegram_id}: {e}")
-    
-    # Показываем следующую анкету
-    await callback_view_profiles(callback, session, state)
+        logger.error(f"Ошибка при сохранении лайка: {e}", exc_info=True)
+        await session.rollback()
+        await callback.answer("❌ Ошибка при сохранении лайка. Попробуйте еще раз.", show_alert=True)
+        return
 
 
 @router.callback_query(F.data.startswith("dislike"))
