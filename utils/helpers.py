@@ -61,7 +61,9 @@ async def check_mutual_like(session: AsyncSession, from_user_id: int, to_user_id
 
 async def get_next_profile(session: AsyncSession, user: User) -> Optional[User]:
     """Получает следующую анкету для просмотра"""
-    from sqlalchemy import select, and_, not_
+    import logging
+    logger = logging.getLogger(__name__)
+    from sqlalchemy import select, and_, not_, or_
     # Получаем ID пользователей, которых уже лайкнули/дизлайкнули
     liked_result = await session.execute(
         select(Like.to_user_id).where(Like.from_user_id == user.id)
@@ -74,24 +76,38 @@ async def get_next_profile(session: AsyncSession, user: User) -> Optional[User]:
     disliked_ids = set(disliked_result.scalars().all())
     excluded_ids = {user.id} | liked_ids | disliked_ids
     
-    # Фильтры
-    conditions = [
+    # Базовые условия (обязательные)
+    base_conditions = [
         User.id != user.id,
         User.is_active == True,
         User.is_banned == False,
         User.is_hidden == False,
-        ~User.id.in_(excluded_ids) if excluded_ids else True
     ]
     
-    # Фильтр по полу
-    if user.interest and user.interest.value == "male":
-        conditions.append(User.gender == "male")
-    elif user.interest and user.interest.value == "female":
-        conditions.append(User.gender == "female")
+    # Проверка на заполненность анкеты (есть имя)
+    base_conditions.append(User.name.isnot(None))
     
-    # Фильтр по городу (если указан)
+    # Добавляем исключения только если они есть
+    if excluded_ids:
+        base_conditions.append(~User.id.in_(excluded_ids))
+    
+    # Фильтры (необязательные - если нет результатов, показываем без фильтров)
+    interest_filter = None
+    if user.interest and user.interest.value == "male":
+        interest_filter = User.gender == "male"
+    elif user.interest and user.interest.value == "female":
+        interest_filter = User.gender == "female"
+    
+    city_filter = None
     if user.city:
-        conditions.append(User.city == user.city)
+        city_filter = User.city == user.city
+    
+    # Пробуем найти с фильтрами
+    conditions = base_conditions.copy()
+    if interest_filter:
+        conditions.append(interest_filter)
+    if city_filter:
+        conditions.append(city_filter)
     
     query = select(User).where(and_(*conditions))
     
@@ -108,8 +124,63 @@ async def get_next_profile(session: AsyncSession, user: User) -> Optional[User]:
     # Сортируем: сначала boost, потом остальные
     boosted_profiles = [p for p in profiles if p.id in boosted_ids]
     other_profiles = [p for p in profiles if p.id not in boosted_ids]
+    all_profiles = boosted_profiles + other_profiles
     
-    return (boosted_profiles + other_profiles)[0] if (boosted_profiles + other_profiles) else None
+    # Если нашли с фильтрами - возвращаем
+    if all_profiles:
+        logger.info(f"Найдено {len(all_profiles)} анкет с фильтрами для пользователя {user.id}")
+        return all_profiles[0]
+    
+    # Если не нашли с фильтрами - пробуем без фильтра по городу
+    if city_filter:
+        conditions = base_conditions.copy()
+        if interest_filter:
+            conditions.append(interest_filter)
+        
+        query = select(User).where(and_(*conditions))
+        result = await session.execute(query)
+        profiles = result.scalars().all()
+        
+        boosted_profiles = [p for p in profiles if p.id in boosted_ids]
+        other_profiles = [p for p in profiles if p.id not in boosted_ids]
+        all_profiles = boosted_profiles + other_profiles
+        
+        if all_profiles:
+            return all_profiles[0]
+    
+    # Если не нашли - пробуем без фильтра по полу
+    if interest_filter:
+        conditions = base_conditions.copy()
+        if city_filter:
+            conditions.append(city_filter)
+        
+        query = select(User).where(and_(*conditions))
+        result = await session.execute(query)
+        profiles = result.scalars().all()
+        
+        boosted_profiles = [p for p in profiles if p.id in boosted_ids]
+        other_profiles = [p for p in profiles if p.id not in boosted_ids]
+        all_profiles = boosted_profiles + other_profiles
+        
+        if all_profiles:
+            return all_profiles[0]
+    
+    # Если все еще не нашли - показываем любые анкеты (только базовые условия)
+    conditions = base_conditions.copy()
+    query = select(User).where(and_(*conditions))
+    result = await session.execute(query)
+    profiles = result.scalars().all()
+    
+    boosted_profiles = [p for p in profiles if p.id in boosted_ids]
+    other_profiles = [p for p in profiles if p.id not in boosted_ids]
+    all_profiles = boosted_profiles + other_profiles
+    
+    if all_profiles:
+        logger.info(f"Найдено {len(all_profiles)} анкет без фильтров для пользователя {user.id}")
+        return all_profiles[0]
+    else:
+        logger.warning(f"Не найдено анкет для пользователя {user.id}. Всего пользователей в базе: {len(profiles)}")
+        return None
 
 
 def format_profile_text(user: User) -> str:
