@@ -29,11 +29,24 @@ async def callback_social_instagram(callback: CallbackQuery, state: FSMContext):
 @router.message(SocialNetwork.instagram)
 async def process_instagram(message: Message, state: FSMContext, session: AsyncSession):
     """Обработка Instagram"""
-    username = message.text.strip().replace("@", "")
+    username = message.text.strip()
+    
+    # Убираем https://instagram.com/ если пользователь вставил полную ссылку
+    if username.startswith("https://instagram.com/"):
+        username = username.replace("https://instagram.com/", "")
+    elif username.startswith("https://www.instagram.com/"):
+        username = username.replace("https://www.instagram.com/", "")
+    elif username.startswith("instagram.com/"):
+        username = username.replace("instagram.com/", "")
+    elif username.startswith("www.instagram.com/"):
+        username = username.replace("www.instagram.com/", "")
+    
+    # Убираем @ и пробелы
+    username = username.replace("@", "").strip()
     
     # Простая валидация
-    if not re.match(r'^[a-zA-Z0-9._]+$', username):
-        await message.answer("Неверный формат username! Попробуй еще раз:")
+    if not username or not re.match(r'^[a-zA-Z0-9._]+$', username):
+        await message.answer("Неверный формат username! Введи только username без @ и ссылок:")
         return
     
     user_id = message.from_user.id
@@ -63,16 +76,32 @@ async def callback_social_vk(callback: CallbackQuery, state: FSMContext):
 @router.message(SocialNetwork.vk)
 async def process_vk(message: Message, state: FSMContext, session: AsyncSession):
     """Обработка VK"""
-    vk_id = message.text.strip()
+    vk_input = message.text.strip()
+    
+    # Убираем https://vk.com/ если пользователь вставил полную ссылку
+    if vk_input.startswith("https://vk.com/"):
+        vk_input = vk_input.replace("https://vk.com/", "")
+    elif vk_input.startswith("vk.com/"):
+        vk_input = vk_input.replace("vk.com/", "")
+    elif vk_input.startswith("http://vk.com/"):
+        vk_input = vk_input.replace("http://vk.com/", "")
+    
+    # Убираем @ если есть
+    vk_input = vk_input.replace("@", "")
+    
+    # Валидация: должен быть username или id123456789 или числовой ID
+    if not vk_input:
+        await message.answer("Неверный формат! Введи username или ID:")
+        return
     
     user_id = message.from_user.id
     result = await session.execute(select(User).where(User.telegram_id == user_id))
     user = result.scalar_one_or_none()
     
     if user:
-        user.vk = vk_id
+        user.vk = vk_input
         await session.commit()
-        await message.answer(f"✅ VK добавлен: {vk_id}", reply_markup=None)
+        await message.answer(f"✅ VK добавлен: {vk_input}", reply_markup=None)
     
     await state.clear()
 

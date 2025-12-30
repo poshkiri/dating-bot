@@ -184,8 +184,20 @@ def format_profile_text(user: User) -> str:
     if user.is_verified:
         text += "\n✅ Проверен"
     if user.instagram:
-        text += f"\n📷 Instagram: @{user.instagram}"
+        instagram_url = f"https://instagram.com/{user.instagram}"
+        text += f"\n📷 Instagram: <a href=\"{instagram_url}\">@{user.instagram}</a>"
     if user.vk:
-        text += f"\n🔵 VK: {user.vk}"
+        # Обработка VK: может быть username, id123456789 или числовой ID
+        vk_username = user.vk.strip()
+        # Если это числовой ID, добавляем id
+        if vk_username.isdigit():
+            vk_url = f"https://vk.com/id{vk_username}"
+        # Если уже начинается с id, используем как есть
+        elif vk_username.startswith('id'):
+            vk_url = f"https://vk.com/{vk_username}"
+        # Иначе считаем это username
+        else:
+            vk_url = f"https://vk.com/{vk_username}"
+        text += f"\n🔵 VK: <a href=\"{vk_url}\">{user.vk}</a>"
     return text
 
