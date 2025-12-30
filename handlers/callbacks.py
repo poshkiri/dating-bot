@@ -169,6 +169,26 @@ async def callback_like(callback: CallbackQuery, session: AsyncSession, state: F
     await session.commit()
     await callback.answer("❤️ Лайк поставлен!")
     
+    # УВЕДОМЛЯЕМ пользователя, которому поставили лайк (для всех, включая бесплатных)
+    try:
+        liker_name = user.name or user.first_name or "Кто-то"
+        liker_username = user.username or ""
+        
+        notification_text = f"❤️ Вам поставили лайк!\n\n"
+        notification_text += f"👤 {liker_name}"
+        if liker_username:
+            notification_text += f" (@{liker_username})"
+        
+        # Отправляем уведомление
+        await callback.bot.send_message(
+            target_user.telegram_id,
+            notification_text
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Не удалось отправить уведомление о лайке пользователю {target_user.telegram_id}: {e}")
+    
     # Показываем следующую анкету
     await callback_view_profiles(callback, session, state)
 
@@ -262,7 +282,24 @@ async def callback_super_like(callback: CallbackQuery, state: FSMContext, sessio
 @router.callback_query(F.data == "next_profile")
 async def callback_next_profile(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
     """Следующая анкета"""
-    await callback_view_profiles(callback, session, state)
+    try:
+        await callback.answer()  # Отвечаем на callback сразу, чтобы избежать ошибок
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Ошибка при ответе на callback: {e}")
+    
+    # Вызываем функцию просмотра анкет
+    try:
+        await callback_view_profiles(callback, session, state)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Ошибка при показе следующей анкеты: {e}")
+        try:
+            await callback.message.answer("Произошла ошибка. Попробуйте еще раз.")
+        except:
+            pass
 
 
 @router.callback_query(F.data == "edit_profile")
@@ -842,34 +879,6 @@ async def callback_event_delete(callback: CallbackQuery, session: AsyncSession):
     )
 
 
-@router.callback_query(F.data.startswith("select_language_"))
-async def callback_select_language(callback: CallbackQuery, session: AsyncSession):
-    """Выбор языка"""
-    from keyboards.common import get_main_menu_keyboard
-    from utils.locales import get_text
-    
-    lang = callback.data.split("_")[2]  # ru или en
-    user_id = callback.from_user.id
-    
-    result = await session.execute(select(User).where(User.telegram_id == user_id))
-    user = result.scalar_one_or_none()
-    
-    if user:
-        user.language = lang
-        await session.commit()
-        
-        text = get_text(lang, f'language_changed_{lang}')
-        
-        await callback.message.edit_text(text)
-        await callback.answer(text)
-        
-        # Показываем главное меню с новым языком
-        await callback.message.answer(
-            get_text(lang, 'welcome_complete'),
-            reply_markup=get_main_menu_keyboard(lang)
-        )
-    else:
-        await callback.answer(get_text('ru', 'error_start'), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("crypto_pay_subscription_"))

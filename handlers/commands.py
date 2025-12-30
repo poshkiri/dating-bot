@@ -129,26 +129,6 @@ async def cmd_complaint(message: Message):
     )
 
 
-@router.message(Command("language"))
-@router.message(F.text == "🌍 Язык")
-@router.message(F.text == "🌍 Language")
-async def cmd_language(message: Message, session: AsyncSession):
-    """Смена языка"""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    
-    # Получаем язык пользователя
-    user_id = message.from_user.id
-    result = await session.execute(select(User).where(User.telegram_id == user_id))
-    user = result.scalar_one_or_none()
-    lang = user.language if user else 'ru'
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🇷🇺 Русский", callback_data="select_language_ru"),
-            InlineKeyboardButton(text="🇬🇧 English", callback_data="select_language_en")
-        ]
-    ])
-    await message.answer(get_text(lang, 'select_language'), reply_markup=keyboard)
 
 
 @router.message(Command("help"))

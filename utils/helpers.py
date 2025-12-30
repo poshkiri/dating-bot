@@ -24,26 +24,15 @@ async def reset_daily_limits(session: AsyncSession, user: User):
 
 async def can_like(session: AsyncSession, user: User) -> tuple[bool, str]:
     """Проверяет, может ли пользователь поставить лайк"""
+    # БЕЗЛИМИТНО для всех - убраны все проверки лимитов
     await reset_daily_limits(session, user)
-    
-    # Проверка подписки
-    if user.subscription_status.value == "active" and user.subscription_expires_at > datetime.utcnow():
-        return True, ""
-    
-    # Проверка лимита
-    if user.daily_likes_used >= settings.DAILY_LIKES_LIMIT + user.referral_bonus_likes:
-        return False, f"Вы исчерпали дневной лимит лайков ({settings.DAILY_LIKES_LIMIT}). Пригласите друзей или купите подписку!"
-    
     return True, ""
 
 
 async def can_dislike(session: AsyncSession, user: User) -> tuple[bool, str]:
     """Проверяет, может ли пользователь поставить дизлайк"""
+    # БЕЗЛИМИТНО для всех - убраны все проверки лимитов
     await reset_daily_limits(session, user)
-    
-    if user.daily_dislikes_used >= settings.DAILY_DISLIKES_LIMIT:
-        return False, f"Вы исчерпали дневной лимит дизлайков ({settings.DAILY_DISLIKES_LIMIT})."
-    
     return True, ""
 
 

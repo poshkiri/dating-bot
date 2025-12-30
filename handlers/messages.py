@@ -14,7 +14,7 @@ from handlers.states import ProfileCreation, EventCreation, SuperLike, Support
 router = Router()
 
 
-@router.message(F.text.in_(["❤️ Смотреть анкеты", "❤️ View Profiles"]))
+@router.message(F.text == "❤️ Смотреть анкеты")
 async def message_view_profiles(message: Message, session: AsyncSession, state: FSMContext):
     """Просмотр анкет через кнопку"""
     user_id = message.from_user.id
@@ -334,24 +334,103 @@ async def create_event(message: Message, state: FSMContext, session: AsyncSessio
 @router.message(SuperLike.message)
 async def process_super_like_message(message: Message, state: FSMContext, session: AsyncSession):
     """Обработка сообщения для суперлайка"""
-    if message.text:
-        data = await state.get_data()
-        target_user_id = data.get("target_user_id")
-        
-        # Здесь создаем суперлайк с сообщением
-        # В реальности здесь будет проверка оплаты
-        
-        await message.answer("💌 Суперлайк отправлен!")
+    user_id = message.from_user.id
+    data = await state.get_data()
+    target_user_id = data.get("target_user_id")
+    
+    if not target_user_id:
+        await message.answer("Ошибка! Пользователь не найден.")
         await state.clear()
+        return
+    
+    # Получаем пользователей
+    result = await session.execute(select(User).where(User.telegram_id == user_id))
+    user = result.scalar_one_or_none()
+    
+    result_target = await session.execute(select(User).where(User.id == target_user_id))
+    target_user = result_target.scalar_one_or_none()
+    
+    if not user or not target_user:
+        await message.answer("Ошибка!")
+        await state.clear()
+        return
+    
+    # Создаем суперлайк
+    from database.models import Like
+    like = Like(
+        from_user_id=user.id,
+        to_user_id=target_user_id,
+        is_super_like=True
+    )
+    
+    if message.text:
+        like.message = message.text
+        await message.answer("💌 Суперлайк отправлен!")
     elif message.video:
         if message.video.duration and message.video.duration > 15:
             await message.answer("Видео должно быть не более 15 секунд!")
             return
-        data = await state.get_data()
-        data["video"] = message.video.file_id
-        await state.update_data(**data)
+        like.video = message.video.file_id
         await message.answer("💌 Суперлайк с видео отправлен!")
-        await state.clear()
+    else:
+        await message.answer("Отправьте текст или видео!")
+        return
+    
+    session.add(like)
+    user.total_likes += 1
+    target_user.total_likes += 1
+    
+    # Проверяем взаимную симпатию
+    from utils.helpers import check_mutual_like
+    is_mutual = await check_mutual_like(session, user.id, target_user_id)
+    if is_mutual:
+        like.is_mutual = True
+        prev_like = await session.execute(
+            select(Like).where(Like.from_user_id == target_user_id, Like.to_user_id == user.id)
+        )
+        prev_like_obj = prev_like.scalar_one_or_none()
+        if prev_like_obj:
+            prev_like_obj.is_mutual = True
+        
+        target_username = target_user.username or "пользователь"
+        await message.answer(
+            f"💕 Взаимная симпатия!\n\n"
+            f"Вы понравились друг другу! Напишите @{target_username}"
+        )
+    
+    await session.commit()
+    
+    # УВЕДОМЛЯЕМ пользователя о суперлайке (для всех, включая бесплатных)
+    try:
+        liker_name = user.name or user.first_name or "Кто-то"
+        liker_username = user.username or ""
+        
+        notification_text = f"⭐ Вам поставили суперлайк!\n\n"
+        notification_text += f"👤 {liker_name}"
+        if liker_username:
+            notification_text += f" (@{liker_username})"
+        
+        if message.text:
+            notification_text += f"\n\n💬 Сообщение: {message.text}"
+        
+        # Отправляем уведомление
+        if message.video:
+            await message.bot.send_video(
+                target_user.telegram_id,
+                message.video.file_id,
+                caption=notification_text
+            )
+        else:
+            await message.bot.send_message(
+                target_user.telegram_id,
+                notification_text
+            )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Не удалось отправить уведомление о суперлайке пользователю {target_user.telegram_id}: {e}")
+    
+    await state.clear()
 
 
 @router.message(Support.waiting_message)

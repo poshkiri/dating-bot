@@ -9,13 +9,12 @@ def get_main_menu_keyboard(lang: str = 'ru') -> ReplyKeyboardMarkup:
     builder.add(KeyboardButton(text=get_text(lang, 'btn_my_profile')))
     builder.add(KeyboardButton(text=get_text(lang, 'btn_view_profiles')))
     builder.add(KeyboardButton(text=get_text(lang, 'btn_complaint')))
-    builder.add(KeyboardButton(text=get_text(lang, 'btn_language')))
     builder.add(KeyboardButton(text=get_text(lang, 'btn_help')))
     builder.add(KeyboardButton(text=get_text(lang, 'btn_events')))
     builder.add(KeyboardButton(text=get_text(lang, 'btn_stats')))
     builder.add(KeyboardButton(text=get_text(lang, 'btn_support')))
     builder.add(KeyboardButton(text=get_text(lang, 'btn_invite')))
-    builder.adjust(2, 2, 2, 1, 2)
+    builder.adjust(2, 2, 2, 2, 2)
     return builder.as_markup(resize_keyboard=True)
 
 
@@ -155,8 +154,8 @@ def get_pause_menu_keyboard(lang: str = 'ru') -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text=get_text(lang, 'btn_view_profiles'), callback_data="view_profiles"))
     builder.add(InlineKeyboardButton(text=get_text(lang, 'btn_my_profile'), callback_data="my_profile"))
-    # Временно оставляем русский текст, так как нет перевода
-    pause_text = "3️⃣ Я больше не хочу никого искать" if lang == 'ru' else "3️⃣ I don't want to search anymore"
+    # Только русский язык
+    pause_text = "3️⃣ Я больше не хочу никого искать"
     invite_text = get_text(lang, 'btn_invite')
     builder.add(InlineKeyboardButton(text=pause_text, callback_data="pause_confirm"))
     builder.add(InlineKeyboardButton(text=invite_text, callback_data="invite_friends"))
