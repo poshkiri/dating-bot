@@ -142,7 +142,7 @@ async def cmd_language(message: Message, session: AsyncSession):
 @router.message(F.text == "📖 Руководство")
 async def cmd_help(message: Message):
     """Руководство по использованию бота"""
-    text = """📖 Руководство по работе с платформой Lilit
+    text = """📖 Руководство по работе с платформой MeetUp
 
 1️⃣ Навигация по главному меню
 /start - Начать работу с ботом
@@ -318,13 +318,13 @@ async def cmd_invite(message: Message, session: AsyncSession):
 
 Вот твоя личная ссылка 👇
 
-Бот знакомств Лилит🍷 в Telegram! Найдет друзей или даже половинку 👫
+Бот знакомств MeetUp ❤️ в Telegram! Найдет друзей или даже половинку 👫
 
 👉 {referral_link}"""
     
     from keyboards.common import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Отправить друзьям в Telegram", url=f"https://t.me/share/url?url={referral_link}&text=Бот знакомств Лилит🍷")
+        InlineKeyboardButton(text="Отправить друзьям в Telegram", url=f"https://t.me/share/url?url={referral_link}&text=Бот знакомств MeetUp ❤️")
     ]])
     
     await message.answer(text, reply_markup=keyboard)

@@ -36,7 +36,7 @@ def get_text(lang: str, key: str, **kwargs) -> str:
 TRANSLATIONS: Dict[str, Dict[str, Any]] = {
     'ru': {
         # Приветствие
-        'welcome': '👋 Добро пожаловать в бот знакомств Лилит! 🍷\n\nДавайте создадим твою анкету, чтобы найти интересных людей!',
+        'welcome': '👋 Добро пожаловать в бот знакомств MeetUp! ❤️\n\nДавайте создадим твою анкету, чтобы найти интересных людей!',
         'welcome_back': '👋 С возвращением!\n\nТвоя анкета еще не заполнена. Давайте создадим её!',
         'welcome_complete': '👋 С возвращением!',
         
@@ -142,7 +142,7 @@ TRANSLATIONS: Dict[str, Dict[str, Any]] = {
     },
     'en': {
         # Welcome
-        'welcome': '👋 Welcome to Lilith dating bot! 🍷\n\nLet\'s create your profile to find interesting people!',
+        'welcome': '👋 Welcome to MeetUp dating bot! ❤️\n\nLet\'s create your profile to find interesting people!',
         'welcome_back': '👋 Welcome back!\n\nYour profile is not filled yet. Let\'s create it!',
         'welcome_complete': '👋 Welcome back!',
         

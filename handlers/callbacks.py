@@ -756,13 +756,13 @@ async def callback_invite_friends(callback: CallbackQuery, session: AsyncSession
 
 Вот твоя личная ссылка 👇
 
-Бот знакомств Лилит🍷 в Telegram! Найдет друзей или даже половинку 👫
+Бот знакомств MeetUp ❤️ в Telegram! Найдет друзей или даже половинку 👫
 
 👉 {referral_link}"""
     
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Отправить друзьям в Telegram", url=f"https://t.me/share/url?url={referral_link}&text=Бот знакомств Лилит🍷")
+        InlineKeyboardButton(text="Отправить друзьям в Telegram", url=f"https://t.me/share/url?url={referral_link}&text=Бот знакомств MeetUp ❤️")
     ]])
     
     await callback.message.answer(text, reply_markup=keyboard)
