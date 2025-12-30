@@ -53,22 +53,24 @@ async def process_verification_photo(message: Message, state: FSMContext, sessio
     await session.commit()
     logger.info(f"Фото верификации сохранено для пользователя {user_id}")
     
-    # Проверяем, находимся ли мы в процессе создания профиля
+    # Проверяем, только что создан ли профиль
     data = await state.get_data()
-    in_profile_creation = data.get("in_profile_creation", False)
+    profile_just_created = data.get("profile_just_created", False)
     
-    if in_profile_creation:
-        # Возвращаемся к добавлению фото
+    if profile_just_created:
+        # Профиль только что создан - завершаем процесс
+        from keyboards.common import get_main_menu_keyboard
+        from utils.locales import get_text
+        lang = user.language or 'ru'
         await message.answer(
             "✅ Фото для верификации отправлено на проверку!\n\n"
             "Администратор проверит твою верификацию в ближайшее время.\n\n"
-            "Теперь можешь добавить еще фото или нажми /done для завершения.",
-            reply_markup=None
+            f"{get_text(lang, 'profile_created')}",
+            reply_markup=get_main_menu_keyboard(lang)
         )
-        from handlers.states import ProfileCreation
-        await state.set_state(ProfileCreation.photo)
-        await state.update_data(in_profile_creation=False)
+        await state.clear()
     else:
+        # Обычная верификация (не при создании профиля)
         await message.answer(
             "✅ Фото отправлено на проверку!\n\n"
             "Администратор проверит твою верификацию в ближайшее время.",

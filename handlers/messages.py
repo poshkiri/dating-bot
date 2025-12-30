@@ -141,25 +141,10 @@ async def process_photo(message: Message, state: FSMContext, session: AsyncSessi
     
     data = await state.get_data()
     photos = data.get("photos", [])
-    is_first_photo = len(photos) == 0
     photos.append(file_id)
     await state.update_data(photos=photos)
     
-    # Если это первое фото - запрашиваем верификацию
-    if is_first_photo:
-        from handlers.states import Verification
-        await message.answer(
-            "✅ Фото добавлено!\n\n"
-            "Теперь нужно пройти верификацию.\n\n"
-            "Для верификации отправь фото с жестом 🤚🏼 (покажи руку).\n"
-            "Это подтверждает, что ты не бот.",
-            reply_markup=None
-        )
-        await state.set_state(Verification.photo)
-        # Сохраняем, что мы в процессе создания профиля
-        await state.update_data(in_profile_creation=True)
-    else:
-        await message.answer("Фото добавлено! Отправьте еще или нажмите /done для завершения")
+    await message.answer("Фото добавлено! Отправьте еще или нажмите /done для завершения")
 
 
 @router.message(ProfileCreation.photo, F.video)

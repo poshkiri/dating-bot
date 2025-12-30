@@ -629,12 +629,20 @@ async def callback_confirm_yes(callback: CallbackQuery, state: FSMContext, sessi
         
         await session.commit()
     
+    # После подтверждения анкеты запрашиваем верификацию
+    from handlers.states import Verification
+    from keyboards.common import get_back_keyboard
+    
     lang = user.language or 'ru'
     await callback.message.answer(
-        get_text(lang, 'profile_created'),
-        reply_markup=get_main_menu_keyboard(lang)
+        "✅ Анкета сохранена!\n\n"
+        "Теперь нужно пройти верификацию.\n\n"
+        "Для верификации отправь фото с жестом 🤚🏼 (покажи руку).\n"
+        "Это подтверждает, что ты не бот. Отправь фото:",
+        reply_markup=get_back_keyboard()
     )
-    await state.clear()
+    await state.set_state(Verification.photo)
+    await state.update_data(profile_just_created=True)
     await callback.answer()
 
 
