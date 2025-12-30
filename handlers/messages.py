@@ -380,10 +380,23 @@ async def process_super_like_message(message: Message, state: FSMContext, sessio
         if prev_like_obj:
             prev_like_obj.is_mutual = True
         
-        target_username = target_user.username or "пользователь"
+        target_name = target_user.name or target_user.first_name or "Пользователь"
+        target_username = target_user.username or ""
+        
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        mutual_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="👤 Посмотреть анкету", callback_data=f"view_profile_{target_user.id}")
+        ]])
+        
+        mutual_text = f"💕 Взаимная симпатия!\n\n"
+        mutual_text += f"👤 {target_name}"
+        if target_username:
+            mutual_text += f" (@{target_username})"
+        mutual_text += f"\n\nВы понравились друг другу!"
+        
         await message.answer(
-            f"💕 Взаимная симпатия!\n\n"
-            f"Вы понравились друг другу! Напишите @{target_username}"
+            mutual_text,
+            reply_markup=mutual_keyboard
         )
     
     await session.commit()
@@ -392,6 +405,11 @@ async def process_super_like_message(message: Message, state: FSMContext, sessio
     try:
         liker_name = user.name or user.first_name or "Кто-то"
         liker_username = user.username or ""
+        
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        notification_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="👤 Посмотреть анкету", callback_data=f"view_profile_{user.id}")
+        ]])
         
         notification_text = f"⭐ Вам поставили суперлайк!\n\n"
         notification_text += f"👤 {liker_name}"
@@ -406,12 +424,14 @@ async def process_super_like_message(message: Message, state: FSMContext, sessio
             await message.bot.send_video(
                 target_user.telegram_id,
                 message.video.file_id,
-                caption=notification_text
+                caption=notification_text,
+                reply_markup=notification_keyboard
             )
         else:
             await message.bot.send_message(
                 target_user.telegram_id,
-                notification_text
+                notification_text,
+                reply_markup=notification_keyboard
             )
     except Exception as e:
         import logging

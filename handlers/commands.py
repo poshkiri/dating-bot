@@ -229,12 +229,7 @@ async def cmd_stats(message: Message, session: AsyncSession):
 ❤️ Получено лайков: {likes_received.scalar() or 0}
 💌 Отправлено лайков: {likes_given.scalar() or 0}
 💕 Взаимных симпатий: {mutual_likes.scalar() or 0}
-👎🏼 Дизлайков: {user.total_dislikes}
-
-📈 Лайков сегодня: {user.daily_likes_used}/{10 + user.referral_bonus_likes}
-🎁 Бонусных лайков: {user.referral_bonus_likes}
-
-💎 Подписка: {"✅ Активна" if user.subscription_status.value == "active" and user.subscription_expires_at > datetime.utcnow() else "❌ Неактивна"}"""
+👎🏼 Дизлайков: {user.total_dislikes}"""
     
     await message.answer(text, reply_markup=None)
 

@@ -22,10 +22,9 @@ async def callback_event_all(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Сначала заполни анкету и укажи город!", show_alert=True)
         return
     
-    # Получаем события в городе пользователя
+    # Получаем все события (не только в городе пользователя)
     events_result = await session.execute(
         select(Event).where(
-            Event.city == user.city,
             Event.event_date >= datetime.utcnow()
         ).order_by(Event.event_date)
     )
@@ -33,7 +32,7 @@ async def callback_event_all(callback: CallbackQuery, session: AsyncSession):
     
     if not events:
         await callback.message.edit_text(
-            f"В городе {user.city} пока нет событий.\n\nСоздай первое событие!",
+            "Пока нет событий.\n\nСоздай первое событие!",
             reply_markup=get_events_menu_keyboard()
         )
         await callback.answer()

@@ -99,15 +99,15 @@ async def callback_view_profiles(callback: CallbackQuery, session: AsyncSession,
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("like"))
+@router.callback_query(F.data.startswith("like_"))
 async def callback_like(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
     """Лайк"""
     user_id = callback.from_user.id
     
-    # Получаем ID целевого пользователя из callback_data или из состояния
-    if "_" in callback.data:
+    # Получаем ID целевого пользователя из callback_data
+    try:
         target_user_id = int(callback.data.split("_")[1])
-    else:
+    except (ValueError, IndexError):
         # Пытаемся получить из состояния (последний просмотренный профиль)
         data = await state.get_data()
         target_user_id = data.get("last_viewed_user_id")
@@ -159,11 +159,24 @@ async def callback_like(callback: CallbackQuery, session: AsyncSession, state: F
         if prev_like_obj:
             prev_like_obj.is_mutual = True
         
-        # Показываем взаимную симпатию
-        target_username = target_user.username or "пользователь"
+        # Показываем взаимную симпатию с именем, username и кнопкой
+        target_name = target_user.name or target_user.first_name or "Пользователь"
+        target_username = target_user.username or ""
+        
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        mutual_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="👤 Посмотреть анкету", callback_data=f"view_profile_{target_user.id}")
+        ]])
+        
+        mutual_text = f"💕 Взаимная симпатия!\n\n"
+        mutual_text += f"👤 {target_name}"
+        if target_username:
+            mutual_text += f" (@{target_username})"
+        mutual_text += f"\n\nВы понравились друг другу!"
+        
         await callback.message.answer(
-            f"💕 Взаимная симпатия!\n\n"
-            f"Вы понравились друг другу! Напишите @{target_username}"
+            mutual_text,
+            reply_markup=mutual_keyboard
         )
     
     await session.commit()
@@ -174,6 +187,11 @@ async def callback_like(callback: CallbackQuery, session: AsyncSession, state: F
         liker_name = user.name or user.first_name or "Кто-то"
         liker_username = user.username or ""
         
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        notification_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="👤 Посмотреть анкету", callback_data=f"view_profile_{user.id}")
+        ]])
+        
         notification_text = f"❤️ Вам поставили лайк!\n\n"
         notification_text += f"👤 {liker_name}"
         if liker_username:
@@ -182,7 +200,8 @@ async def callback_like(callback: CallbackQuery, session: AsyncSession, state: F
         # Отправляем уведомление
         await callback.bot.send_message(
             target_user.telegram_id,
-            notification_text
+            notification_text,
+            reply_markup=notification_keyboard
         )
     except Exception as e:
         import logging
@@ -1284,6 +1303,71 @@ async def process_transaction_hash(message: Message, session: AsyncSession, stat
             "Попробуйте ввести хеш еще раз или отправьте /cancel",
             parse_mode="HTML"
         )
+
+
+@router.callback_query(F.data.startswith("view_profile_"))
+async def callback_view_profile(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    """Просмотр конкретного профиля по ID"""
+    try:
+        target_user_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError):
+        await callback.answer("Ошибка! Профиль не найден.", show_alert=True)
+        return
+    
+    user_id = callback.from_user.id
+    result = await session.execute(select(User).where(User.telegram_id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        await callback.answer("Ошибка! Начните с /start", show_alert=True)
+        return
+    
+    # Получаем целевого пользователя
+    target_result = await session.execute(select(User).where(User.id == target_user_id))
+    target_user = target_result.scalar_one_or_none()
+    
+    if not target_user:
+        await callback.answer("Профиль не найден!", show_alert=True)
+        return
+    
+    # Сохраняем ID в состояние
+    await state.update_data(last_viewed_user_id=target_user.id)
+    
+    text = format_profile_text(target_user)
+    lang = user.language or 'ru'
+    keyboard = get_profile_view_keyboard(lang)
+    keyboard.inline_keyboard[0][0].callback_data = f"like_{target_user.id}"
+    keyboard.inline_keyboard[0][1].callback_data = f"dislike_{target_user.id}"
+    keyboard.inline_keyboard[0][2].callback_data = f"super_like_{target_user.id}"
+    keyboard.inline_keyboard[1][0].callback_data = f"next_profile"
+    
+    # Отправляем профиль
+    if target_user.videos and len(target_user.videos) > 0:
+        try:
+            await callback.message.answer_video(target_user.videos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Не удалось отправить видео: {e}")
+            if target_user.photos and len(target_user.photos) > 0:
+                try:
+                    await callback.message.answer_photo(target_user.photos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
+                except:
+                    await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+            else:
+                await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    elif target_user.photos and len(target_user.photos) > 0:
+        try:
+            await callback.message.answer_photo(target_user.photos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Не удалось отправить фото: {e}")
+            await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    else:
+        await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    
+    await callback.answer()
 
 
 @router.callback_query(F.data == "back")
