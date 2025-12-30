@@ -50,17 +50,31 @@ async def process_verification_photo(message: Message, state: FSMContext, sessio
     photo = message.photo[-1]
     user.verification_photo = photo.file_id
     # is_verified остается False до одобрения админом
-    # В реальности здесь будет отправка фото админам для проверки
-    # Пока просто сохраняем фото
     await session.commit()
     logger.info(f"Фото верификации сохранено для пользователя {user_id}")
     
-    await message.answer(
-        "✅ Фото отправлено на проверку!\n\n"
-        "Администратор проверит твою верификацию в ближайшее время.",
-        reply_markup=get_back_keyboard()
-    )
-    await state.clear()
+    # Проверяем, находимся ли мы в процессе создания профиля
+    data = await state.get_data()
+    in_profile_creation = data.get("in_profile_creation", False)
+    
+    if in_profile_creation:
+        # Возвращаемся к добавлению фото
+        await message.answer(
+            "✅ Фото для верификации отправлено на проверку!\n\n"
+            "Администратор проверит твою верификацию в ближайшее время.\n\n"
+            "Теперь можешь добавить еще фото или нажми /done для завершения.",
+            reply_markup=None
+        )
+        from handlers.states import ProfileCreation
+        await state.set_state(ProfileCreation.photo)
+        await state.update_data(in_profile_creation=False)
+    else:
+        await message.answer(
+            "✅ Фото отправлено на проверку!\n\n"
+            "Администратор проверит твою верификацию в ближайшее время.",
+            reply_markup=get_back_keyboard()
+        )
+        await state.clear()
     
     # Уведомляем админов
     from config import settings

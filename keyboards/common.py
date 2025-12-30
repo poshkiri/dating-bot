@@ -37,10 +37,6 @@ def get_my_profile_keyboard() -> InlineKeyboardMarkup:
     builder.add(InlineKeyboardButton(text="3️⃣ Изменить фото/видео", callback_data="edit_media"))
     builder.add(InlineKeyboardButton(text="4️⃣ Изменить текст анкеты", callback_data="edit_text"))
     builder.add(InlineKeyboardButton(text="⚙️ Фильтры", callback_data="filters"))
-    builder.add(InlineKeyboardButton(text="✅ Верификация", callback_data="verify"))
-    builder.add(InlineKeyboardButton(text="📱 Соцсети", callback_data="social_menu"))
-    builder.add(InlineKeyboardButton(text="💎 Boost анкеты", callback_data="boost"))
-    builder.add(InlineKeyboardButton(text="💳 Подписка", callback_data="subscription"))
     builder.adjust(1)
     return builder.as_markup()
 

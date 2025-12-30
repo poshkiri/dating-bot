@@ -98,28 +98,16 @@ async def process_age(message: Message, state: FSMContext, session: AsyncSession
         await message.answer("Пожалуйста, введите число")
 
 
-@router.message(ProfileCreation.city_manual)
-async def process_city_manual(message: Message, state: FSMContext):
-    """Обработка города (вручную)"""
+@router.message(ProfileCreation.city)
+async def process_city(message: Message, state: FSMContext):
+    """Обработка города"""
     city = message.text.strip()
     await state.update_data(city=city)
     await message.answer("Как мне тебя называть?")
     await state.set_state(ProfileCreation.name)
 
 
-@router.message(ProfileCreation.city, F.location)
-async def process_city_location(message: Message, state: FSMContext, session: AsyncSession):
-    """Обработка геолокации"""
-    from services.google_maps import google_maps_service
-    location = message.location
-    city = await google_maps_service.reverse_geocode(location.latitude, location.longitude)
-    
-    if not city:
-        city = "Не определен"
-    
-    await state.update_data(city=city, latitude=location.latitude, longitude=location.longitude)
-    await message.answer(f"Город определен: {city}\n\nКак мне тебя называть?")
-    await state.set_state(ProfileCreation.name)
+# Обработка геолокации убрана - теперь только текстовый ввод города
 
 
 @router.message(ProfileCreation.name)
@@ -153,10 +141,25 @@ async def process_photo(message: Message, state: FSMContext, session: AsyncSessi
     
     data = await state.get_data()
     photos = data.get("photos", [])
+    is_first_photo = len(photos) == 0
     photos.append(file_id)
     await state.update_data(photos=photos)
     
-    await message.answer("Фото добавлено! Отправьте еще или нажмите /done для завершения")
+    # Если это первое фото - запрашиваем верификацию
+    if is_first_photo:
+        from handlers.states import Verification
+        await message.answer(
+            "✅ Фото добавлено!\n\n"
+            "Теперь нужно пройти верификацию.\n\n"
+            "Для верификации отправь фото с жестом 🤚🏼 (покажи руку).\n"
+            "Это подтверждает, что ты не бот.",
+            reply_markup=None
+        )
+        await state.set_state(Verification.photo)
+        # Сохраняем, что мы в процессе создания профиля
+        await state.update_data(in_profile_creation=True)
+    else:
+        await message.answer("Фото добавлено! Отправьте еще или нажмите /done для завершения")
 
 
 @router.message(ProfileCreation.photo, F.video)

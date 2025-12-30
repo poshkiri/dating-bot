@@ -563,7 +563,7 @@ async def callback_interest(callback: CallbackQuery, state: FSMContext):
     """Выбор интереса"""
     interest = callback.data
     await state.update_data(interest=interest)
-    await callback.message.answer("Из какого ты города?", reply_markup=get_city_keyboard())
+    await callback.message.answer("Из какого ты города?", reply_markup=None)
     await state.set_state(ProfileCreation.city)
     await callback.answer()
 
