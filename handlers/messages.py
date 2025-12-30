@@ -516,7 +516,9 @@ async def process_support_message(message: Message, session: AsyncSession, state
                 )
             sent_to_admins = True
         except Exception as e:
-            print(f"Ошибка отправки сообщения администратору {admin_id}: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Ошибка отправки сообщения администратору {admin_id}: {e}")
     
     if sent_to_admins:
         await message.answer(

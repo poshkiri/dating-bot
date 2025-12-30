@@ -228,7 +228,9 @@ async def callback_broadcast_send(callback: CallbackQuery, session: AsyncSession
                 )
             sent_count += 1
         except Exception as e:
-            print(f"Ошибка отправки пользователю {user.telegram_id}: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Ошибка отправки пользователю {user.telegram_id}: {e}")
     
     admin_msg.sent_count = sent_count
     admin_msg.sent_at = func.now()

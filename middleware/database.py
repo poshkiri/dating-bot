@@ -16,6 +16,11 @@ class DatabaseMiddleware(BaseMiddleware):
     ) -> Any:
         # Инжектим и SQLite сессию (для обратной совместимости) и MongoDB
         async with async_session_maker() as session:
-            data["session"] = session  # SQLAlchemy сессия
-            data["database"] = await get_mongodb()  # MongoDB база данных
-            return await handler(event, data)
+            try:
+                data["session"] = session  # SQLAlchemy сессия
+                data["database"] = await get_mongodb()  # MongoDB база данных
+                return await handler(event, data)
+            except Exception as e:
+                # Откатываем транзакцию при ошибке
+                await session.rollback()
+                raise

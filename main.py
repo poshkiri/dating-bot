@@ -60,6 +60,12 @@ async def main():
     
     dp = Dispatcher(storage=storage)
     
+    # Регистрация middleware для обработки ошибок (первым!)
+    from middleware.error_handler import ErrorHandlerMiddleware
+    dp.message.middleware(ErrorHandlerMiddleware())
+    dp.callback_query.middleware(ErrorHandlerMiddleware())
+    dp.edited_message.middleware(ErrorHandlerMiddleware())
+    
     # Регистрация middleware для dependency injection сессии БД
     dp.message.middleware(DatabaseMiddleware())
     dp.callback_query.middleware(DatabaseMiddleware())
@@ -77,13 +83,34 @@ async def main():
     dp.include_router(events.router)
     dp.include_router(social.router)
     
+    # Проверка подключения к Telegram API
+    try:
+        logger.info("Проверка подключения к Telegram API...")
+        me = await bot.get_me()
+        logger.info(f"✅ Бот подключен: @{me.username} (ID: {me.id})")
+    except Exception as e:
+        logger.error(f"❌ Ошибка подключения к Telegram API: {e}")
+        logger.error("Возможные причины:")
+        logger.error("1. Проблемы с интернет-соединением")
+        logger.error("2. Неправильный BOT_TOKEN")
+        logger.error("3. Telegram API временно недоступен")
+        await bot.session.close()
+        return
+    
     # Создание таблиц
-    await create_tables()
-    logger.info("Таблицы созданы")
+    try:
+        await create_tables()
+        logger.info("✅ Таблицы созданы")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при создании таблиц: {e}")
+        logger.warning("Продолжаем работу, но возможны проблемы с БД")
     
     # Запуск бота
-    logger.info("Бот запущен")
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    logger.info("🚀 Бот запущен и готов к работе!")
+    try:
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    except Exception as e:
+        logger.error(f"❌ Критическая ошибка при работе бота: {e}", exc_info=True)
 
 
 if __name__ == "__main__":
