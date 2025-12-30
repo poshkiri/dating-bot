@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 @router.message(Command("start"))
 async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
     """Обработчик команды /start"""
+    # Очищаем состояние при /start
+    await state.clear()
+    
     user_id = message.from_user.id
     
     # Проверяем, существует ли пользователь
@@ -51,22 +54,22 @@ async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
                 await session.commit()
         
         lang = user.language or 'ru'
+        # Объединяем приветствие и вопрос в одно сообщение
+        welcome_text = f"{get_text(lang, 'welcome')}\n\n{get_text(lang, 'ask_age')}"
         await message.answer(
-            get_text(lang, 'welcome'),
-            reply_markup=get_main_menu_keyboard(lang)
+            welcome_text,
+            reply_markup=None
         )
-        # Начинаем создание анкеты
-        await message.answer(get_text(lang, 'ask_age'), reply_markup=None)
         await state.set_state(ProfileCreation.age)
     else:
         lang = user.language or 'ru'
         if not user.name or not user.age:
             # Анкета не заполнена
+            welcome_text = f"{get_text(lang, 'welcome_back')}\n\n{get_text(lang, 'ask_age')}"
             await message.answer(
-                get_text(lang, 'welcome_back'),
-                reply_markup=get_main_menu_keyboard(lang)
+                welcome_text,
+                reply_markup=None
             )
-            await message.answer(get_text(lang, 'ask_age'), reply_markup=None)
             await state.set_state(ProfileCreation.age)
         else:
             # Показываем главное меню
