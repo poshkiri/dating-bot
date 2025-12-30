@@ -96,26 +96,26 @@ async def cmd_my_profile(message: Message, session: AsyncSession, state: FSMCont
     # Приоритет: сначала видео, потом фото
     if user.videos and len(user.videos) > 0:
         try:
-            await message.answer_video(user.videos[0], caption=text, reply_markup=get_my_profile_keyboard())
+            await message.answer_video(user.videos[0], caption=text, reply_markup=get_my_profile_keyboard(), parse_mode="HTML")
         except Exception as e:
             logger.warning(f"Не удалось отправить видео: {e}. Пробуем фото.")
             # Если видео не отправилось, пробуем фото
             if user.photos and len(user.photos) > 0:
                 try:
-                    await message.answer_photo(user.photos[0], caption=text, reply_markup=get_my_profile_keyboard())
+                    await message.answer_photo(user.photos[0], caption=text, reply_markup=get_my_profile_keyboard(), parse_mode="HTML")
                 except:
-                    await message.answer(text, reply_markup=get_my_profile_keyboard())
+                    await message.answer(text, reply_markup=get_my_profile_keyboard(), parse_mode="HTML")
             else:
-                await message.answer(text, reply_markup=get_my_profile_keyboard())
+                await message.answer(text, reply_markup=get_my_profile_keyboard(), parse_mode="HTML")
     elif user.photos and len(user.photos) > 0:
         try:
-            await message.answer_photo(user.photos[0], caption=text, reply_markup=get_my_profile_keyboard())
+            await message.answer_photo(user.photos[0], caption=text, reply_markup=get_my_profile_keyboard(), parse_mode="HTML")
         except Exception as e:
             # Если file_id невалиден (например, от старого бота), отправляем только текст
             logger.warning(f"Не удалось отправить фото: {e}. Отправляем текст без фото.")
-            await message.answer(text, reply_markup=get_my_profile_keyboard())
+            await message.answer(text, reply_markup=get_my_profile_keyboard(), parse_mode="HTML")
     else:
-        await message.answer(text, reply_markup=get_my_profile_keyboard())
+        await message.answer(text, reply_markup=get_my_profile_keyboard(), parse_mode="HTML")
 
 
 @router.message(Command("complaint"))

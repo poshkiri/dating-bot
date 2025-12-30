@@ -54,7 +54,7 @@ async def message_view_profiles(message: Message, session: AsyncSession, state: 
     # Приоритет: сначала видео, потом фото
     if next_profile.videos and len(next_profile.videos) > 0:
         try:
-            await message.answer_video(next_profile.videos[0], caption=text, reply_markup=keyboard)
+            await message.answer_video(next_profile.videos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
@@ -62,22 +62,22 @@ async def message_view_profiles(message: Message, session: AsyncSession, state: 
             # Если видео не отправилось, пробуем фото
             if next_profile.photos and len(next_profile.photos) > 0:
                 try:
-                    await message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard)
+                    await message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
                 except:
-                    await message.answer(text, reply_markup=keyboard)
+                    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
             else:
-                await message.answer(text, reply_markup=keyboard)
+                await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
     elif next_profile.photos and len(next_profile.photos) > 0:
         try:
-            await message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard)
+            await message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
         except Exception as e:
             # Если file_id невалиден (например, от старого бота), отправляем только текст
             import logging
             logger = logging.getLogger(__name__)
             logger.warning(f"Не удалось отправить фото профиля: {e}. Отправляем текст без фото.")
-            await message.answer(text, reply_markup=keyboard)
+            await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
     else:
-        await message.answer(text, reply_markup=keyboard)
+        await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
 
 @router.message(ProfileCreation.age)
@@ -221,15 +221,15 @@ async def process_done(message: Message, state: FSMContext, session: AsyncSessio
     
     if user.photos and len(user.photos) > 0:
         try:
-            await message.answer_photo(user.photos[0], caption=text, reply_markup=get_confirm_keyboard())
+            await message.answer_photo(user.photos[0], caption=text, reply_markup=get_confirm_keyboard(), parse_mode="HTML")
         except Exception as e:
             # Если file_id невалиден (например, от старого бота), отправляем только текст
             import logging
             logger = logging.getLogger(__name__)
             logger.warning(f"Не удалось отправить фото: {e}. Отправляем текст без фото.")
-            await message.answer(text, reply_markup=get_confirm_keyboard())
-    else:
-        await message.answer(text, reply_markup=get_confirm_keyboard())
+            await message.answer(text, reply_markup=get_confirm_keyboard(), parse_mode="HTML")
+        else:
+        await message.answer(text, reply_markup=get_confirm_keyboard(), parse_mode="HTML")
     
     await state.set_state(ProfileCreation.confirm)
 

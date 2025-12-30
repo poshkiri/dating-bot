@@ -67,7 +67,7 @@ async def callback_view_profiles(callback: CallbackQuery, session: AsyncSession,
         except:
             pass
         try:
-            await callback.message.answer_video(next_profile.videos[0], caption=text, reply_markup=keyboard)
+            await callback.message.answer_video(next_profile.videos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
@@ -75,26 +75,26 @@ async def callback_view_profiles(callback: CallbackQuery, session: AsyncSession,
             # Если видео не отправилось, пробуем фото
             if next_profile.photos and len(next_profile.photos) > 0:
                 try:
-                    await callback.message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard)
+                    await callback.message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
                 except:
-                    await callback.message.answer(text, reply_markup=keyboard)
+                    await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
             else:
-                await callback.message.answer(text, reply_markup=keyboard)
+                await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
     elif next_profile.photos and len(next_profile.photos) > 0:
         try:
             await callback.message.delete()
         except:
             pass
         try:
-            await callback.message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard)
+            await callback.message.answer_photo(next_profile.photos[0], caption=text, reply_markup=keyboard, parse_mode="HTML")
         except Exception as e:
             # Если file_id невалиден (например, от старого бота), отправляем только текст
             import logging
             logger = logging.getLogger(__name__)
             logger.warning(f"Не удалось отправить фото профиля: {e}. Отправляем текст без фото.")
-            await callback.message.answer(text, reply_markup=keyboard)
+            await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
     else:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     
     await callback.answer()
 
