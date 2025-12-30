@@ -7,8 +7,10 @@ from sqlalchemy import select
 from database.models import User
 from keyboards.common import get_back_keyboard
 from datetime import datetime
+import logging
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 from handlers.states import Verification
@@ -34,8 +36,6 @@ async def callback_verify(callback: CallbackQuery, state: FSMContext):
 @router.message(Verification.photo, F.photo)
 async def process_verification_photo(message: Message, state: FSMContext, session: AsyncSession):
     """Обработка фото для верификации"""
-    import logging
-    logger = logging.getLogger(__name__)
     logger.info(f"Получено фото для верификации от пользователя {message.from_user.id}")
     
     user_id = message.from_user.id
@@ -62,17 +62,38 @@ async def process_verification_photo(message: Message, state: FSMContext, sessio
     )
     await state.clear()
     
-    # Уведомляем админов (в реальности)
-    # from config import settings
-    # for admin_id in settings.admin_ids:
-    #     try:
-    #         await message.bot.send_photo(
-    #             admin_id,
-    #             photo.file_id,
-    #             caption=f"Верификация от @{message.from_user.username or 'пользователь'}"
-    #         )
-    #     except:
-    #         pass
+    # Уведомляем админов
+    from config import settings
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    user_info = f"👤 Пользователь: @{message.from_user.username or 'без username'}\n"
+    user_info += f"🆔 ID: {user_id}\n"
+    user_info += f"📝 Имя: {message.from_user.first_name or 'не указано'}\n"
+    if message.from_user.last_name:
+        user_info += f"📝 Фамилия: {message.from_user.last_name}\n"
+    
+    caption = f"🛡️ Новая верификация\n\n{user_info}"
+    
+    # Создаем кнопки для одобрения/отклонения
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Одобрить", callback_data=f"verify_approve_{user_id}"),
+            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"verify_reject_{user_id}")
+        ]
+    ])
+    
+    # Отправляем фото всем администраторам
+    for admin_id in settings.admin_ids:
+        try:
+            await message.bot.send_photo(
+                admin_id,
+                photo.file_id,
+                caption=caption,
+                reply_markup=keyboard
+            )
+            logger.info(f"Фото верификации отправлено администратору {admin_id}")
+        except Exception as e:
+            logger.error(f"Ошибка отправки фото администратору {admin_id}: {e}")
 
 
 @router.message(Verification.photo)
@@ -81,5 +102,80 @@ async def process_verification_other(message: Message, state: FSMContext):
     await message.answer(
         "❌ Пожалуйста, отправь фото для верификации.\n\n"
         "Нужно отправить фото с жестом 🤚🏼 (покажи руку)."
+    )
+
+
+@router.callback_query(F.data.startswith("verify_approve_"))
+async def callback_verify_approve(callback: CallbackQuery, session: AsyncSession):
+    """Одобрение верификации администратором"""
+    from config import settings
+    
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("Доступ запрещен!", show_alert=True)
+        return
+    
+    user_id = int(callback.data.split("_")[2])
+    result = await session.execute(select(User).where(User.telegram_id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        await callback.answer("Пользователь не найден!", show_alert=True)
+        return
+    
+    # Одобряем верификацию
+    user.is_verified = True
+    await session.commit()
+    
+    # Уведомляем пользователя
+    try:
+        await callback.bot.send_message(
+            user.telegram_id,
+            "✅ Ваша верификация одобрена!\n\n"
+            "Теперь ваша анкета отмечена как верифицированная."
+        )
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомления пользователю {user_id}: {e}")
+    
+    await callback.answer("✅ Верификация одобрена!")
+    await callback.message.edit_caption(
+        callback.message.caption + "\n\n✅ Одобрено администратором"
+    )
+
+
+@router.callback_query(F.data.startswith("verify_reject_"))
+async def callback_verify_reject(callback: CallbackQuery, session: AsyncSession):
+    """Отклонение верификации администратором"""
+    from config import settings
+    
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("Доступ запрещен!", show_alert=True)
+        return
+    
+    user_id = int(callback.data.split("_")[2])
+    result = await session.execute(select(User).where(User.telegram_id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        await callback.answer("Пользователь не найден!", show_alert=True)
+        return
+    
+    # Очищаем фото верификации
+    user.verification_photo = None
+    user.is_verified = False
+    await session.commit()
+    
+    # Уведомляем пользователя
+    try:
+        await callback.bot.send_message(
+            user.telegram_id,
+            "❌ Ваша верификация отклонена.\n\n"
+            "Пожалуйста, отправьте новое фото для верификации с четким жестом 🤚🏼."
+        )
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомления пользователю {user_id}: {e}")
+    
+    await callback.answer("❌ Верификация отклонена")
+    await callback.message.edit_caption(
+        callback.message.caption + "\n\n❌ Отклонено администратором"
     )
 
